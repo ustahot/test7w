@@ -22,6 +22,8 @@ class RandomSQL
         if (!$st = Cfg::getDB()->prepare($sql)){
             die('Не удалось подготовить запрос на получение точки дерева по Id!');
         }
+        
+        $st->bindParam(':id', $id, PDO::PARAM_INT);
 
         if (!$st->execute()){
 
@@ -77,6 +79,7 @@ class RandomSQL
 
             die('Не удалось выполнить запрос на удаление всех записей по random!');
         }
+
                 
     }
     
@@ -86,7 +89,7 @@ class RandomSQL
         
         $db = Cfg::getDB();
         
-        if (!$st = $this->prepare($sql)){
+        if (!$st = $db->prepare($sql)){
             die('Не удалось подготовить запрос добавление записи по random!');
         }
         
@@ -105,9 +108,9 @@ class RandomSQL
     public function getList()
     {
         $sql = "SELECT c.id
-                    , c.name
+                    , c.name selfname
                     , c.parent
-                    , p.name
+                    , p.name parentname
                 FROM random_sql c
                     LEFT OUTER JOIN random_sql p ON c.parent = p.id
                 ";
@@ -133,18 +136,180 @@ class RandomSQL
     }
 
     
-    public static function fill()
+    public static function randomFill()
     {
-        $treeLen = rand(10, 30);
         
-        for ($currentPoint = 1; $currentPoint <= $treeLen; $currentPoint ++){
-            $deep = rand(0, 5);ffffffffffffffffffffff
+        $asciiMin = 65;
+        $asciiMax = 90;
+        $rootLen = random_int(10, 30);
+        
+        for ($currentRootPoint = 1; $currentRootPoint <= $rootLen; $currentRootPoint ++){
+
+            $deep = random_int(0, 5);
             
-            /*$currentParentId = 
+            $parentId = null;
+            $parentId[0] = null;
             
-            for ($currentDeep = 1; $currentDeep < $deep; $currentDeep ++)
-            */
+            for ($currentDeep = 0; $currentDeep < $deep; $currentDeep ++){
+
+                $pointQuantity = random_int(0, 5);
+                
+                for ($currentPoint = 1; $currentPoint <= $pointQuantity; $currentPoint ++){
+                    $nameLen = random_int(1, 4);
+                    $name = '';
+
+                    for ($currentCharPos = 1; $currentCharPos <= $nameLen; $currentCharPos ++){
+                        $name = $name . chr(random_int($asciiMin, $asciiMax));
+                    }
+
+                    $point = new RandomSQL;
+
+                    $point->setName($name);
+                    $point->setParent($parentId[$currentDeep]);
+
+                    $point->insert();
+                    $parentId[$currentDeep + 1] = $point->getId();
+                }
+
+            }
+            
         }
+
+    }
+    
+    public function getTree()
+    {
+        /*$sql = "SELECT if(level1.name IS NULL, root.name, '|') root
+                    , if(level2.name IS NULL, CONCAT('--', level1.name), '|') level1
+                    , if(level3.name IS NULL, CONCAT('--', level2.name), '|') level2
+                    , if(level4.name IS NULL, CONCAT('--', level3.name), '|') level3
+                    , if(level5.name IS NULL, CONCAT('--', level4.name), '|') level4
+                    , level5.name level5
+                    
+                FROM random_sql root
+                    LEFT OUTER JOIN random_sql level1 ON root.id = level1.parent
+                        LEFT OUTER JOIN random_sql level2 ON level1.id = level2.parent
+                            LEFT OUTER JOIN random_sql level3 ON level2.id = level3.parent
+                                LEFT OUTER JOIN random_sql level4 ON level3.id = level4.parent
+                                    LEFT OUTER JOIN random_sql level5 ON level4.id = level5.parent
+                ORDER BY root.id
+                        , level1.id
+                        , level2.id
+                        , level3.id
+                        , level4.id
+                        , level5.id
+                ";*/
+        
+        $sql = "SELECT l0.name l0
+                    , l1.name l1
+                    , l2.name l2
+                    , l3.name l3
+                    , l4.name l4
+                    , l5.name l5
+
+                FROM random_sql l0
+                    LEFT OUTER JOIN random_sql l1 ON l0.id = l1.parent
+                        LEFT OUTER JOIN random_sql l2 ON l1.id = l2.parent
+                            LEFT OUTER JOIN random_sql l3 ON l2.id = l3.parent
+                                LEFT OUTER JOIN random_sql l4 ON l3.id = l4.parent
+                                    LEFT OUTER JOIN random_sql l5 ON l4.id = l5.parent
+
+                WHERE l0.parent IS NULL
+                ORDER BY l0.id
+                        , l1.id
+                        , l2.id
+                        , l3.id
+                        , l4.id
+                        , l5.id
+
+                ";
+
+        
+        $result['header'] = ["Корень", "1-я степень", "2-я степень", "3-я степень", "4-я степень", "5-я степень"];
+        
+        if (!$st = Cfg::getDB()->prepare($sql)){
+            die('Не удалось подготовить запрос на получение дерева!');
+        }
+        
+        
+        if (!$st->execute()) {
+            die('Не удалось выполнить запрос на получение дерева!');
+        }
+        
+        $result['body'] = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)){
+            $result['body'][] = ['data' => $row];
+        }
+        
+        $tranzit = $st->fetchall(PDO::FETCH_ASSOC);
+        
+        
+        return $result;
+    }
+
+
+    public function getDescendants()
+    {
+        $sql = "SELECT DISTINCT root.id, root.name, root.parent
+                  FROM random_sql root
+                    INNER JOIN random_sql level1 ON root.id = level1.parent
+                        INNER JOIN random_sql level2 ON level1.id = level2.parent
+                            INNER JOIN random_sql level3 ON level2.id = level3.parent
+                  WHERE root.parent IS NULL
+                ";
+        
+        $result['header'] = ["Id", "Имя", "Родитель"];
+        
+        if (!$st = Cfg::getDB()->prepare($sql)){
+            die('Не удалось подготовить запрос на получение потомков!');
+        }
+        
+        
+        if (!$st->execute()) {
+            die('Не удалось выполнить запрос на получение потомков!');
+        }
+        
+        $result['body'] = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)){
+            $result['body'][] = ['data' => $row];
+        }
+
+            
+        return $result;
+        
+    }
+
+   
+    public function getParents()
+    {
+        $sql = "SELECT DISTINCT level.id, level.name, level.parent
+                FROM random_sql level
+                  INNER JOIN random_sql parent1 ON level.parent = parent1.id
+                      INNER JOIN random_sql parent2 ON parent1.parent = parent2.id
+                WHERE level.id NOT IN (
+                                        SELECT IFNULL(d.parent, 0)
+                                        FROM random_sql d
+                                      )
+                ";
+        
+        $result['header'] = ["Id", "Имя", "Потомок"];
+        
+        if (!$st = Cfg::getDB()->prepare($sql)){
+            die('Не удалось подготовить запрос на получение родителей!');
+        }
+        
+        
+        if (!$st->execute()) {
+            die('Не удалось выполнить запрос на получение родителей!');
+        }
+        
+        $result['body'] = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)){
+            $result['body'][] = ['data' => $row];
+        }
+
+            
+        return $result;
     }
         
 }

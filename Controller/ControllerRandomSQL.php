@@ -29,6 +29,7 @@ class ControllerRandomSQL
     
     public function showForm()
     {
+        
         $pageName = 'random'; // Делаю через переменную для наглядности
         
         $this->setParams([null, $pageName]);
@@ -37,6 +38,17 @@ class ControllerRandomSQL
         $pageView->show();
     }
     
+
+    public function showTree()
+    {
+        $pageName = 'tree'; // Делаю через переменную для наглядности
+        
+        $this->setParams([null, $pageName]);
+        
+        $pageView = new PageView("desktop", $this->getParams(), "uni_desktop_table");
+        $pageView->show();
+    }
+
     
     public function runAction()
     {
@@ -53,6 +65,16 @@ class ControllerRandomSQL
         $this->setParams([null, $pageName]);
         $pageView = new PageView('desktop', $this->getParams(), 'desktop_random_result');
         $pageView->show();
+    }
+    
+    public function reFill()
+    {
+        RandomSQL::deleteAll();
+        RandomSQL::randomFill();
+        
+        header("Location: router.php?params=RandomSQL_showForm");
+
+                           
     }
 
 }
